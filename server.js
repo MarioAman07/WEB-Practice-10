@@ -106,6 +106,10 @@ app.post('/api/products', async (req, res) => {
     }
 });
 
+app.get('/', (req, res) => {
+    res.send('API is running. Go to /api/products to see data.');
+});
+
 // Connect to DB first, then start the server
 connectDB().then(() => {
     app.listen(PORT, () => {
