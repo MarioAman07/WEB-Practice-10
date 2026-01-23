@@ -1,53 +1,61 @@
+require('dotenv').config(); // 1. Load environment variables from .env (must be the first line)
 const express = require('express');
 const { MongoClient, ObjectId } = require('mongodb');
 
 const app = express();
-const PORT = 3000;
 
-const url = 'mongodb://127.0.0.1:27017';
-const client = new MongoClient(url);
+// 2. Use system PORT for deployment or 3000 for local development
+const PORT = process.env.PORT || 3000;
+
+// 3. Get connection string from environment variable (no hardcoded secrets!)
+const url = process.env.MONGO_URI; 
 const dbName = 'shop';
 let db, productsCollection;
 
+// Create client instance once
+const client = new MongoClient(url);
+
 app.use(express.json());
 
+// Logging middleware
 app.use((req, res, next) => {
     console.log(`${req.method} ${req.url}`);
     next();
 });
 
+// Database connection function
 async function connectDB() {
     try {
+        if (!url) {
+            throw new Error("CRITICAL ERROR: MONGO_URI is not defined in .env");
+        }
         await client.connect();
         console.log('Connected successfully to MongoDB');
         db = client.db(dbName);
         productsCollection = db.collection('products');
     } catch (err) {
         console.error('MongoDB connection error:', err);
+        process.exit(1); // Terminate process if DB connection fails
     }
 }
 
+// --- ROUTES ---
+
+// GET /api/products - Get all products with filtering, sorting, and projection
 app.get('/api/products', async (req, res) => {
     try {
         const { category, minPrice, sort, fields } = req.query;
         
         let query = {};
-        if (category) {
-            query.category = category;
-        }
-        if (minPrice) {
-            query.price = { $gte: parseFloat(minPrice) };
-        }
+        if (category) query.category = category;
+        if (minPrice) query.price = { $gte: parseFloat(minPrice) };
 
         let sortOptions = {};
-        if (sort === 'price') {
-            sortOptions.price = 1;
-        }
+        if (sort === 'price') sortOptions.price = 1;
 
         let projection = {};
         if (fields) {
-            const fieldsArray = fields.split(',');
-            fieldsArray.forEach(field => {
+            fields.split(',').forEach(field => {
                 projection[field.trim()] = 1;
             });
         }
@@ -68,7 +76,7 @@ app.get('/api/products', async (req, res) => {
     }
 });
 
-
+// GET /api/products/:id - Get a single product by ID
 app.get('/api/products/:id', async (req, res) => {
     const { id } = req.params;
     if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID format" });
@@ -82,9 +90,12 @@ app.get('/api/products/:id', async (req, res) => {
     }
 });
 
+// POST /api/products - Add a new product
 app.post('/api/products', async (req, res) => {
     const { name, price, category } = req.body;
-    if (!name || !price || !category) return res.status(400).json({ error: "Missing required fields" });
+    if (!name || !price || !category) {
+        return res.status(400).json({ error: "Missing required fields (name, price, category)" });
+    }
 
     try {
         const newProduct = { name, price: parseFloat(price), category };
@@ -95,8 +106,9 @@ app.post('/api/products', async (req, res) => {
     }
 });
 
+// Connect to DB first, then start the server
 connectDB().then(() => {
     app.listen(PORT, () => {
-        console.log(`Server is running on http://localhost:${PORT}`);
+        console.log(`Server is running on port ${PORT}`);
     });
 });
