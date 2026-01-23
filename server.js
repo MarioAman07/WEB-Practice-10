@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
 
 // 3. Get connection string from environment variable (no hardcoded secrets!)
 const url = process.env.MONGO_URI; 
-const dbName = 'shop';
+const dbName = 'api';
 let db, productsCollection;
 
 // Create client instance once
