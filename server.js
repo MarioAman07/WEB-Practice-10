@@ -1,118 +1,110 @@
-require('dotenv').config(); // 1. Load environment variables from .env (must be the first line)
+require('dotenv').config();
 const express = require('express');
 const { MongoClient, ObjectId } = require('mongodb');
 
 const app = express();
-
-// 2. Use system PORT for deployment or 3000 for local development
 const PORT = process.env.PORT || 3000;
+const url = process.env.MONGO_URI;
+const dbName = 'shop';
+let db, itemsCollection;
 
-// 3. Get connection string from environment variable (no hardcoded secrets!)
-const url = process.env.MONGO_URI; 
-const dbName = 'api';
-let db, productsCollection;
-
-// Create client instance once
 const client = new MongoClient(url);
 
 app.use(express.json());
 
-// Logging middleware
-app.use((req, res, next) => {
-    console.log(`${req.method} ${req.url}`);
-    next();
-});
-
-// Database connection function
+// Database Connection
 async function connectDB() {
     try {
-        if (!url) {
-            throw new Error("CRITICAL ERROR: MONGO_URI is not defined in .env");
-        }
         await client.connect();
-        console.log('Connected successfully to MongoDB');
+        console.log('Connected to MongoDB Atlas');
         db = client.db(dbName);
-        productsCollection = db.collection('products');
+        itemsCollection = db.collection('items'); // Как требует задание 13
     } catch (err) {
-        console.error('MongoDB connection error:', err);
-        process.exit(1); // Terminate process if DB connection fails
+        console.error('Connection error:', err);
+        process.exit(1);
     }
 }
 
-// --- ROUTES ---
+// --- REST API ENDPOINTS ---
 
-// GET /api/products - Get all products with filtering, sorting, and projection
-app.get('/api/products', async (req, res) => {
+// 1. GET ALL ITEMS
+app.get('/api/items', async (req, res) => {
     try {
-        const { category, minPrice, sort, fields } = req.query;
+        const items = await itemsCollection.find({}).toArray();
+        res.status(200).json(items);
+    } catch (err) {
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// 2. POST (CREATE)
+app.post('/api/items', async (req, res) => {
+    try {
+        const { name, price, category } = req.body;
+        if (!name || !price) return res.status(400).json({ error: "Name and price are required" });
+
+        const newItem = { name, price: parseFloat(price), category: category || "general" };
+        const result = await itemsCollection.insertOne(newItem);
+        res.status(201).json({ _id: result.insertedId, ...newItem });
+    } catch (err) {
+        res.status(500).json({ error: "Could not create item" });
+    }
+});
+
+// 3. PUT (FULL UPDATE) - Заменяет объект целиком
+app.put('/api/items/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, price, category } = req.body;
         
-        let query = {};
-        if (category) query.category = category;
-        if (minPrice) query.price = { $gte: parseFloat(minPrice) };
+        if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID" });
+        if (!name || !price || !category) return res.status(400).json({ error: "All fields are required for PUT" });
 
-        let sortOptions = {};
-        if (sort === 'price') sortOptions.price = 1;
+        const result = await itemsCollection.replaceOne(
+            { _id: new ObjectId(id) },
+            { name, price: parseFloat(price), category }
+        );
 
-        let projection = {};
-        if (fields) {
-            fields.split(',').forEach(field => {
-                projection[field.trim()] = 1;
-            });
-        }
-
-        const products = await productsCollection
-            .find(query)
-            .project(projection)
-            .sort(sortOptions)
-            .toArray();
-
-        res.json({
-            count: products.length,
-            products: products
-        });
+        if (result.matchedCount === 0) return res.status(404).json({ error: "Item not found" });
+        res.status(200).json({ message: "Item updated (PUT)" });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ error: "Update failed" });
     }
 });
 
-// GET /api/products/:id - Get a single product by ID
-app.get('/api/products/:id', async (req, res) => {
-    const { id } = req.params;
-    if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID format" });
-
+// 4. PATCH (PARTIAL UPDATE) - Обновляет только присланные поля
+app.patch('/api/items/:id', async (req, res) => {
     try {
-        const product = await productsCollection.findOne({ _id: new ObjectId(id) });
-        if (!product) return res.status(404).json({ error: "Product not found" });
-        res.json(product);
+        const { id } = req.params;
+        if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID" });
+
+        const result = await itemsCollection.updateOne(
+            { _id: new ObjectId(id) },
+            { $set: req.body }
+        );
+
+        if (result.matchedCount === 0) return res.status(404).json({ error: "Item not found" });
+        res.status(200).json({ message: "Item patched (PATCH)" });
     } catch (err) {
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ error: "Patch failed" });
     }
 });
 
-// POST /api/products - Add a new product
-app.post('/api/products', async (req, res) => {
-    const { name, price, category } = req.body;
-    if (!name || !price || !category) {
-        return res.status(400).json({ error: "Missing required fields (name, price, category)" });
-    }
-
+// 5. DELETE
+app.delete('/api/items/:id', async (req, res) => {
     try {
-        const newProduct = { name, price: parseFloat(price), category };
-        const result = await productsCollection.insertOne(newProduct);
-        res.status(201).json({ message: "Product created", productId: result.insertedId });
+        const { id } = req.params;
+        if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID" });
+
+        const result = await itemsCollection.deleteOne({ _id: new ObjectId(id) });
+        if (result.deletedCount === 0) return res.status(404).json({ error: "Item not found" });
+
+        res.status(204).send();
     } catch (err) {
-        res.status(500).json({ error: "Could not create product" });
+        res.status(500).json({ error: "Delete failed" });
     }
 });
 
-app.get('/', (req, res) => {
-    res.send('API is running. Go to /api/products to see data.');
-});
-
-// Connect to DB first, then start the server
 connectDB().then(() => {
-    app.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`);
-    });
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 });
