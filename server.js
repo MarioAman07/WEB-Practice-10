@@ -28,7 +28,7 @@ async function connectDB() {
 // --- REST API ENDPOINTS ---
 
 // 1. GET ALL ITEMS
-app.get('/api/items', async (req, res) => {
+app.get('/api/products', async (req, res) => {
     try {
         const items = await itemsCollection.find({}).toArray();
         res.status(200).json(items);
@@ -38,7 +38,7 @@ app.get('/api/items', async (req, res) => {
 });
 
 // 2. POST (CREATE)
-app.post('/api/items', async (req, res) => {
+app.post('/api/products', async (req, res) => {
     try {
         const { name, price, category } = req.body;
         if (!name || !price) return res.status(400).json({ error: "Name and price are required" });
@@ -52,7 +52,7 @@ app.post('/api/items', async (req, res) => {
 });
 
 // 3. PUT (FULL UPDATE) - Заменяет объект целиком
-app.put('/api/items/:id', async (req, res) => {
+app.put('/api/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { name, price, category } = req.body;
@@ -73,7 +73,7 @@ app.put('/api/items/:id', async (req, res) => {
 });
 
 // 4. PATCH (PARTIAL UPDATE) - Обновляет только присланные поля
-app.patch('/api/items/:id', async (req, res) => {
+app.patch('/api/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
         if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID" });
@@ -91,7 +91,7 @@ app.patch('/api/items/:id', async (req, res) => {
 });
 
 // 5. DELETE
-app.delete('/api/items/:id', async (req, res) => {
+app.delete('/api/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
         if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID" });
