@@ -5,7 +5,7 @@ const { MongoClient, ObjectId } = require('mongodb');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const url = process.env.MONGO_URI;
-const dbName = 'shop';
+const dbName = 'api';
 let db, itemsCollection;
 
 const client = new MongoClient(url);
@@ -18,16 +18,16 @@ async function connectDB() {
         await client.connect();
         console.log('Connected to MongoDB Atlas');
         db = client.db(dbName);
-        itemsCollection = db.collection('items'); // Как требует задание 13
+        itemsCollection = db.collection('products');
     } catch (err) {
         console.error('Connection error:', err);
         process.exit(1);
     }
 }
 
-// --- REST API ENDPOINTS ---
+// --- Rest Api Endpoints
 
-// 1. GET ALL ITEMS
+// 1. GET all items
 app.get('/api/products', async (req, res) => {
     try {
         const items = await itemsCollection.find({}).toArray();
@@ -78,15 +78,19 @@ app.patch('/api/products/:id', async (req, res) => {
         const { id } = req.params;
         if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID" });
 
+        const updateData = { ...req.body };
+        delete updateData._id;
+
         const result = await itemsCollection.updateOne(
             { _id: new ObjectId(id) },
-            { $set: req.body }
+            { $set: updateData }
         );
 
         if (result.matchedCount === 0) return res.status(404).json({ error: "Item not found" });
-        res.status(200).json({ message: "Item patched (PATCH)" });
+        res.status(200).json({ message: "Item patched" });
     } catch (err) {
-        res.status(500).json({ error: "Patch failed" });
+        console.error("ПОЛНАЯ ОШИБКА ТУТ:", err); 
+        res.status(500).json({ error: "Patch failed", details: err.message });
     }
 });
 
