@@ -12,7 +12,7 @@ const client = new MongoClient(url);
 
 app.use(express.json());
 
-// Подключение к БД
+// База данных
 async function connectDB() {
     try {
         await client.connect();
@@ -25,17 +25,31 @@ async function connectDB() {
     }
 }
 
-// 1. GET ALL 
+// 1. Механизм защиты (Задание 14): API Key в заголовках 
+const API_KEY = process.env.API_KEY || "my-secret-key-123";
+
+const authMiddleware = (req, res, next) => {
+    const userApiKey = req.headers['x-api-key'];
+
+    if (!userApiKey || userApiKey !== API_KEY) {
+        // Если ключ неверный, возвращаем 401 Unauthorized 
+        return res.status(401).json({ error: "Unauthorized: Invalid or missing API Key" });
+    }
+    next();
+};
+
+// --- REST API ENDPOINTS ---
+
+// GET (Публичные эндпоинты)
 app.get('/api/products', async (req, res) => {
     try {
         const items = await itemsCollection.find({}).toArray();
-        res.status(200).json(items); // Код 200 согласно заданию 
+        res.status(200).json(items);
     } catch (err) {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
-// 2. GET BY ID
 app.get('/api/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -50,8 +64,10 @@ app.get('/api/products/:id', async (req, res) => {
     }
 });
 
-// 3. POST - Создать новый товар 
-app.post('/api/products', async (req, res) => {
+// Защищенные эндпоинты (используют authMiddleware) 
+
+// POST - Создание
+app.post('/api/products', authMiddleware, async (req, res) => {
     try {
         const { name, price, category } = req.body;
         if (!name || price === undefined) {
@@ -71,16 +87,15 @@ app.post('/api/products', async (req, res) => {
     }
 });
 
-// 4. PUT - Полное обновление
-app.put('/api/products/:id', async (req, res) => {
+// PUT - Полное обновление
+app.put('/api/products/:id', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
         const { name, price, category } = req.body;
         
         if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID" });
-        
         if (!name || price === undefined || !category) {
-            return res.status(400).json({ error: "All fields (name, price, category) are required for PUT" });
+            return res.status(400).json({ error: "All fields are required for PUT" });
         }
 
         const result = await itemsCollection.replaceOne(
@@ -95,8 +110,8 @@ app.put('/api/products/:id', async (req, res) => {
     }
 });
 
-// 5. PATCH - Частичное обновление 
-app.patch('/api/products/:id', async (req, res) => {
+// PATCH - Частичное обновление
+app.patch('/api/products/:id', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
         if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID" });
@@ -116,8 +131,8 @@ app.patch('/api/products/:id', async (req, res) => {
     }
 });
 
-// 6. DELETE - Удаление товара
-app.delete('/api/products/:id', async (req, res) => {
+// DELETE - Удаление
+app.delete('/api/products/:id', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
         if (!ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID" });
