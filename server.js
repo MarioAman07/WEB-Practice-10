@@ -38,6 +38,38 @@ const authMiddleware = (req, res, next) => {
     next();
 };
 
+// Welcome Page Route
+app.get('/', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>API Service | Active</title>
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f7f6; color: #333; }
+                .container { text-align: center; padding: 2rem; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+                h1 { color: #4a90e2; margin-bottom: 0.5rem; }
+                p { font-size: 1.1rem; color: #666; }
+                .status-badge { display: inline-block; padding: 5px 12px; background: #2ecc71; color: white; border-radius: 20px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; }
+                .host-info { margin-top: 20px; font-size: 0.9rem; color: #999; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="status-badge">System Live</div>
+                <h1>Welcome to the Product API</h1>
+                <p>The RESTful service is running smoothly.</p>
+                <div class="host-info">
+                    Powered by <strong>Node.js</strong> & <strong>MongoDB Atlas</strong><br>
+                    Deployed and running on <strong>Render Cloud</strong>
+                </div>
+            </div>
+        </body>
+        </html>
+    `);
+});
 // --- REST API ENDPOINTS ---
 
 // GET (Публичные эндпоинты)
